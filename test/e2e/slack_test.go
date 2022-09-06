@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -691,6 +692,115 @@ func TestDiscord(t *testing.T) {
 			// Same expected message as before
 			err = discordTester.WaitForLastMessageContains(testerUserID, channel.ID, command)
 			assert.NoError(t, err)
+		})
+	})
+
+	t.Run("Executor", func(t *testing.T) {
+		t.Run("Get Deployment", func(t *testing.T) {
+			command := fmt.Sprintf("get deploy -n %s %s", appCfg.Deployment.Namespace, appCfg.Deployment.Name)
+			assertionFn := func(msg *discordgo.Message) bool {
+				return strings.Contains(msg.Content, heredoc.Doc(fmt.Sprintf("Cluster: %s", appCfg.ClusterName))) &&
+					strings.Contains(msg.Content, "botkube")
+			}
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Get Configmap", func(t *testing.T) {
+			command := fmt.Sprintf("get configmap -n %s", appCfg.Deployment.Namespace)
+			assertionFn := func(msg *discordgo.Message) bool {
+				return strings.Contains(msg.Content, heredoc.Doc(fmt.Sprintf("Cluster: %s", appCfg.ClusterName))) &&
+					strings.Contains(msg.Content, "kube-root-ca.crt") &&
+					strings.Contains(msg.Content, "botkube-global-config")
+			}
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Get forbidden resource", func(t *testing.T) {
+			command := "get ingress"
+			expectedMessage := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'ingress' resources in the 'default' Namespace on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Specify unknown command", func(t *testing.T) {
+			command := "unknown"
+			expectedMessage := codeBlock("Command not supported. Please run /botkubehelp to see supported commands.")
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Specify invalid command", func(t *testing.T) {
+			command := "get"
+			expectedMessage := codeBlock(fmt.Sprintf("Cluster: %s\nYou must specify the type of resource to get. Use \"kubectl api-resources\" for a complete list of supported resources.\n\nerror: Required resource not specified.\nUse \"kubectl explain <resource>\" for a detailed description of that resource (e.g. kubectl explain pods).\nSee 'kubectl get -h' for help and examples\nexit status 1", appCfg.ClusterName))
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Specify forbidden namespace", func(t *testing.T) {
+			command := "get po --namespace team-b"
+			expectedMessage := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'po' resources in the 'team-b' Namespace on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("Based on other bindings", func(t *testing.T) {
+			t.Run("Wait for Deployment (the 2st binding)", func(t *testing.T) {
+				command := fmt.Sprintf("wait deployment -n %s %s --for condition=Available=True", appCfg.Deployment.Namespace, appCfg.Deployment.Name)
+				assertionFn := func(msg *discordgo.Message) bool {
+					return strings.Contains(msg.Content, heredoc.Doc(fmt.Sprintf("Cluster: %s", appCfg.ClusterName))) &&
+						strings.Contains(msg.Content, "deployment.apps/botkube condition met")
+				}
+
+				discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+				err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+				assert.NoError(t, err)
+			})
+
+			t.Run("Exec (the 3rd binding which is disabled)", func(t *testing.T) {
+				command := "exec"
+				expectedMessage := codeBlock("Command not supported. Please run /botkubehelp to see supported commands.")
+
+				discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+				err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+				assert.NoError(t, err)
+			})
+
+			t.Run("Get all Pods (the 4th binding)", func(t *testing.T) {
+				command := "get pods -A"
+				expectedMessage := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'pods' resources for all Namespaces on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
+
+				discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+				err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+				assert.NoError(t, err)
+			})
+
+			t.Run("Get all Deployments (the 4th binding)", func(t *testing.T) {
+				command := "get deploy -A"
+				assertionFn := func(msg *discordgo.Message) bool {
+					return strings.Contains(msg.Content, heredoc.Doc(fmt.Sprintf("Cluster: %s", appCfg.ClusterName))) &&
+						strings.Contains(msg.Content, "local-path-provisioner") &&
+						strings.Contains(msg.Content, "coredns") &&
+						strings.Contains(msg.Content, "botkube")
+				}
+
+				discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+				err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+				assert.NoError(t, err)
+			})
 		})
 	})
 }
