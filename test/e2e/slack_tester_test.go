@@ -136,8 +136,8 @@ func (d *discordTester) WaitForLastMessageContains(userID, channelID string, exp
 	})
 }
 
-func (s *discordTester) WaitForLastMessageEqual(userID, channelID string, expectedMsg string) error {
-	return s.WaitForMessagePosted(userID, channelID, 1, func(msg *discordgo.Message) bool {
+func (d *discordTester) WaitForLastMessageEqual(userID, channelID string, expectedMsg string) error {
+	return d.WaitForMessagePosted(userID, channelID, 1, func(msg *discordgo.Message) bool {
 		return msg.Content == expectedMsg
 	})
 }
@@ -191,6 +191,15 @@ func (d *discordTester) WaitForMessagePosted(userID, channelID string, limitMess
 	}
 
 	return nil
+}
+
+func (d *discordTester) WaitForMessagesPostedOnChannels(userID string, channelIDs []string, limitMessages int, msgAssertFn func(msg *discordgo.Message) bool) error {
+	errs := multierror.New()
+	for _, channelID := range channelIDs {
+		errs = multierror.Append(errs, d.WaitForMessagePosted(userID, channelID, limitMessages, msgAssertFn))
+	}
+
+	return errs.ErrorOrNil()
 }
 
 func (s *slackTester) CreateChannel(t *testing.T) (*slack.Channel, func(t *testing.T)) {

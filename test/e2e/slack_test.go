@@ -11,10 +11,12 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/bwmarrin/discordgo"
+	"github.com/kubeshop/botkube/pkg/filterengine/filters"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vrischmann/envconfig"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -356,7 +358,7 @@ const (
 //
 //		t.Log("Expecting bot message in first channel...")
 //		assertionFn := func(msg slack.Message) bool {
-//			return doesMessageContainExactlyOneAttachment(
+//			return doesSlackMessageContainExactlyOneAttachment(
 //				msg,
 //				"v1/configmaps created",
 //				"2eb886",
@@ -381,7 +383,7 @@ const (
 //
 //		t.Log("Expecting bot message in all channels...")
 //		assertionFn = func(msg slack.Message) bool {
-//			return doesMessageContainExactlyOneAttachment(
+//			return doesSlackMessageContainExactlyOneAttachment(
 //				msg,
 //				"v1/configmaps updated",
 //				"daa038",
@@ -428,7 +430,7 @@ const (
 //
 //		t.Log("Expecting bot message on second channel...")
 //		assertionFn = func(msg slack.Message) bool {
-//			return doesMessageContainExactlyOneAttachment(
+//			return doesSlackMessageContainExactlyOneAttachment(
 //				msg,
 //				"v1/configmaps updated",
 //				"daa038",
@@ -471,7 +473,7 @@ const (
 //
 //		t.Log("Expecting bot message on first channel...")
 //		assertionFn = func(msg slack.Message) bool {
-//			return doesMessageContainExactlyOneAttachment(
+//			return doesSlackMessageContainExactlyOneAttachment(
 //				msg,
 //				"v1/configmaps deleted",
 //				"a30200",
@@ -484,7 +486,7 @@ const (
 //		t.Log("Ensuring bot didn't write anything new on second channel...")
 //		time.Sleep(appCfg.Slack.MessageWaitTimeout)
 //		assertionFn = func(msg slack.Message) bool {
-//			return doesMessageContainExactlyOneAttachment(
+//			return doesSlackMessageContainExactlyOneAttachment(
 //				msg,
 //				"v1/configmaps updated",
 //				"daa038",
@@ -803,13 +805,175 @@ func TestDiscord(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("Multi-channel notifications", func(t *testing.T) {
+		cfgMapCli := k8sCli.CoreV1().ConfigMaps(appCfg.Deployment.Namespace)
+		var channelIDs []string
+		for _, channel := range channels {
+			channelIDs = append(channelIDs, channel.ID)
+		}
+
+		t.Log("Creating ConfigMap...")
+		var cfgMapAlreadyDeleted bool
+		cfgMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      channel.Name,
+				Namespace: appCfg.Deployment.Namespace,
+			},
+		}
+		cfgMap, err = cfgMapCli.Create(context.Background(), cfgMap, metav1.CreateOptions{})
+		require.NoError(t, err)
+
+		t.Cleanup(func() { cleanupCreatedCfgMapIfShould(t, cfgMapCli, cfgMap.Name, &cfgMapAlreadyDeleted) })
+
+		t.Log("Expecting bot message in first channel...")
+		assertionFn := func(msg *discordgo.Message) bool {
+			return doesDiscordMessageContainExactlyOneEmbed(
+				msg,
+				"v1/configmaps created",
+				8311585,
+				fmt.Sprintf("ConfigMap *%s/%s* has been created in *%s* cluster", cfgMap.Namespace, cfgMap.Name, appCfg.ClusterName),
+			)
+		}
+		err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+		require.NoError(t, err)
+
+		t.Log("Expecting no bot message in second channel...")
+		expectedMessage := fmt.Sprintf("...and now my watch begins for cluster '%s'! :crossed_swords:", appCfg.ClusterName)
+		time.Sleep(appCfg.Discord.MessageWaitTimeout)
+		err = discordTester.WaitForLastMessageEqual(botUserID, secondChannel.ID, expectedMessage)
+		require.NoError(t, err)
+
+		t.Log("Updating ConfigMap...")
+		cfgMap.Data = map[string]string{
+			"operation": "update",
+		}
+		cfgMap, err = cfgMapCli.Update(context.Background(), cfgMap, metav1.UpdateOptions{})
+		require.NoError(t, err)
+
+		t.Log("Expecting bot message in all channels...")
+		assertionFn = func(msg *discordgo.Message) bool {
+			return doesDiscordMessageContainExactlyOneEmbed(
+				msg,
+				"v1/configmaps updated",
+				16312092,
+				fmt.Sprintf("ConfigMap *%s/%s* has been updated in *%s* cluster", cfgMap.Namespace, cfgMap.Name, appCfg.ClusterName),
+			)
+		}
+		err = discordTester.WaitForMessagesPostedOnChannels(botUserID, channelIDs, 1, assertionFn)
+		require.NoError(t, err)
+
+		t.Log("Stopping notifier...")
+		command := "notifier stop"
+		expectedMessage = codeBlock(fmt.Sprintf("Sure! I won't send you notifications from cluster '%s' here.", appCfg.ClusterName))
+
+		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+		err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+		assert.NoError(t, err)
+
+		t.Log("Getting notifier status from second channel...")
+		command = "notifier status"
+		expectedMessage = codeBlock(fmt.Sprintf("Notifications from cluster '%s' are enabled here.", appCfg.ClusterName))
+		discordTester.PostMessageToBot(t, botUserID, secondChannel.ID, command)
+		err = discordTester.WaitForLastMessageEqual(botUserID, secondChannel.ID, expectedMessage)
+		assert.NoError(t, err)
+
+		t.Log("Getting notifier status from first channel...")
+		command = "notifier status"
+		expectedMessage = codeBlock(fmt.Sprintf("Notifications from cluster '%s' are disabled here.", appCfg.ClusterName))
+		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+		err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+		assert.NoError(t, err)
+
+		t.Log("Updating ConfigMap once again...")
+		cfgMap.Data = map[string]string{
+			"operation": "update-second",
+		}
+		_, err = cfgMapCli.Update(context.Background(), cfgMap, metav1.UpdateOptions{})
+		require.NoError(t, err)
+
+		t.Log("Ensuring bot didn't write anything new on first channel...")
+		time.Sleep(appCfg.Slack.MessageWaitTimeout)
+		// Same expected message as before
+		err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+		require.NoError(t, err)
+
+		t.Log("Expecting bot message on second channel...")
+		assertionFn = func(msg *discordgo.Message) bool {
+			return doesDiscordMessageContainExactlyOneEmbed(
+				msg,
+				"v1/configmaps updated",
+				16312092,
+				fmt.Sprintf("ConfigMap *%s/%s* has been updated in *%s* cluster", cfgMap.Namespace, cfgMap.Name, appCfg.ClusterName),
+			)
+		}
+		err = discordTester.WaitForMessagePosted(botUserID, secondChannel.ID, 1, assertionFn)
+		require.NoError(t, err)
+
+		t.Log("Starting notifier")
+		command = "notifier start"
+		expectedMessage = codeBlock(fmt.Sprintf("Brace yourselves, incoming notifications from cluster '%s'.", appCfg.ClusterName))
+		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+		err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+		require.NoError(t, err)
+
+		t.Log("Creating and deleting ignored ConfigMap")
+		ignoredCfgMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-ignored", channel.Name),
+				Namespace: appCfg.Deployment.Namespace,
+				Annotations: map[string]string{
+					filters.DisableAnnotation: "true",
+				},
+			},
+		}
+		_, err = cfgMapCli.Create(context.Background(), ignoredCfgMap, metav1.CreateOptions{})
+		require.NoError(t, err)
+		err = cfgMapCli.Delete(context.Background(), ignoredCfgMap.Name, metav1.DeleteOptions{})
+		require.NoError(t, err)
+
+		t.Log("Ensuring bot didn't write anything new...")
+		time.Sleep(appCfg.Slack.MessageWaitTimeout)
+		err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+		require.NoError(t, err)
+
+		t.Log("Deleting ConfigMap")
+		err = cfgMapCli.Delete(context.Background(), cfgMap.Name, metav1.DeleteOptions{})
+		require.NoError(t, err)
+		cfgMapAlreadyDeleted = true
+
+		t.Log("Expecting bot message on first channel...")
+		assertionFn = func(msg *discordgo.Message) bool {
+			return doesDiscordMessageContainExactlyOneEmbed(
+				msg,
+				"v1/configmaps deleted",
+				13632027,
+				fmt.Sprintf("ConfigMap *%s/%s* has been deleted in *%s* cluster", cfgMap.Namespace, cfgMap.Name, appCfg.ClusterName),
+			)
+		}
+		err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
+		require.NoError(t, err)
+
+		t.Log("Ensuring bot didn't write anything new on second channel...")
+		time.Sleep(appCfg.Slack.MessageWaitTimeout)
+		assertionFn = func(msg *discordgo.Message) bool {
+			return doesDiscordMessageContainExactlyOneEmbed(
+				msg,
+				"v1/configmaps updated",
+				16312092,
+				fmt.Sprintf("ConfigMap *%s/%s* has been updated in *%s* cluster", cfgMap.Namespace, cfgMap.Name, appCfg.ClusterName),
+			)
+		}
+		err = discordTester.WaitForMessagePosted(botUserID, secondChannel.ID, 1, assertionFn)
+		require.NoError(t, err)
+	})
 }
 
 func codeBlock(in string) string {
 	return fmt.Sprintf("```\n%s\n```", in)
 }
 
-func doesMessageContainExactlyOneAttachment(msg slack.Message, expectedTitle, expectedColor, expectedFieldMessage string) bool {
+func doesSlackMessageContainExactlyOneAttachment(msg slack.Message, expectedTitle, expectedColor, expectedFieldMessage string) bool {
 	if len(msg.Attachments) != 1 {
 		return false
 	}
@@ -827,6 +991,17 @@ func doesMessageContainExactlyOneAttachment(msg slack.Message, expectedTitle, ex
 	return title == expectedTitle &&
 		color == expectedColor &&
 		fieldMessage == expectedFieldMessage
+}
+
+func doesDiscordMessageContainExactlyOneEmbed(msg *discordgo.Message, expectedTitle string, expectedColor int, expectedFieldMessage string) bool {
+	if len(msg.Embeds) != 1 {
+		return false
+	}
+
+	embed := msg.Embeds[0]
+	return embed.Title == expectedTitle &&
+		embed.Color == expectedColor &&
+		embed.Description == expectedFieldMessage
 }
 
 func cleanupCreatedCfgMapIfShould(t *testing.T, cfgMapCli corev1.ConfigMapInterface, name string, cfgMapAlreadyDeleted *bool) {
