@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/bwmarrin/discordgo"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
@@ -36,8 +37,8 @@ type Config struct {
 		}
 	}
 	ClusterName string `envconfig:"default=sample"`
-	//Slack       SlackConfig
-	Discord DiscordConfig
+	Slack       SlackConfig
+	Discord     DiscordConfig
 }
 
 type SlackConfig struct {
@@ -568,7 +569,6 @@ func TestDiscord(t *testing.T) {
 		appCfg.Deployment.Envs.DefaultDiscordChannelIDName:   channel,
 		appCfg.Deployment.Envs.SecondaryDiscordChannelIDName: secondChannel,
 	}
-	t.Logf("Just added channels...: %+v", channels)
 
 	for _, currentChannel := range channels {
 		discordTester.PostInitialMessage(t, currentChannel.ID)
@@ -597,6 +597,18 @@ func TestDiscord(t *testing.T) {
 		//discordTester.PostMessageToBot(t, channel.ID, command)
 		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
 		err := discordTester.WaitForLastMessageContains(botUserID, channel.ID, expectedMessage)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Filters list", func(t *testing.T) {
+		command := "filters list"
+		expectedMessage := codeBlock(heredoc.Doc(`
+			FILTER                  ENABLED DESCRIPTION
+			NodeEventsChecker       true    Sends notifications on node level critical events.
+			ObjectAnnotationChecker true    Checks if annotations botkube.io/* present in object specs and filters them.`))
+
+		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+		err := discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
 		assert.NoError(t, err)
 	})
 }

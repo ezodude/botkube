@@ -118,36 +118,10 @@ func (d *discordTester) PostInitialMessage(t *testing.T, channelID string) {
 	require.NoError(t, err)
 }
 
-func (d *discordTester) InviteBotToChannel(t *testing.T, botID, channelID string) {
+func (d *discordTester) InviteBotToChannel(_ *testing.T, _, _ string) {
 	// This is not required in Discord.
 	// Bots can't "join" text channels because when you join a server you're already in every text channel.
 	// See: https://stackoverflow.com/questions/60990748/making-discord-bot-join-leave-a-channel
-
-	//t.Logf("Inviting bot with ID %q to the channel with ID %q", botID, channelID)
-	//
-	//err := d.cli.GuildMemberMove(d.cfg.GuildID, botID, &channelID)
-	//require.NoError(t, err)
-
-	//data := struct {
-	//	//TargetType int    `json:"target_type"`
-	//	TargetUser string `json:"target_user_id"`
-	//	MaxAge     int    `json:"max_age"`
-	//	MaxUses    int    `json:"max_uses"`
-	//	Temporary  bool   `json:"temporary"`
-	//	Unique     bool   `json:"unique"`
-	//	//}{int(discordgo.InviteTargetStream), botID, 0, 0, false, false}
-	//}{botID, 0, 0, false, false}
-	//
-	//body, err := d.cli.RequestWithBucketID("POST", discordgo.EndpointChannelInvites(channelID), data, discordgo.EndpointChannelInvites(channelID))
-	//require.NoError(t, err)
-	//
-	//var invite discordgo.Invite
-	//err = json.Unmarshal(body, &invite)
-	//require.NoError(t, err)
-
-	//t.Logf("Created invite: %+v", invite)
-
-	//createdInvite, err := d.cli.ChannelInviteCreate(channelID, discordgo.Invite{})
 }
 
 func (d *discordTester) WaitForMessagePostedRecentlyEqual(userID, channelID, expectedMsg string) error {
@@ -159,6 +133,12 @@ func (d *discordTester) WaitForMessagePostedRecentlyEqual(userID, channelID, exp
 func (d *discordTester) WaitForLastMessageContains(userID, channelID string, expectedMsgSubstring string) error {
 	return d.WaitForMessagePosted(userID, channelID, 1, func(msg *discordgo.Message) bool {
 		return strings.Contains(msg.Content, expectedMsgSubstring)
+	})
+}
+
+func (s *discordTester) WaitForLastMessageEqual(userID, channelID string, expectedMsg string) error {
+	return s.WaitForMessagePosted(userID, channelID, 1, func(msg *discordgo.Message) bool {
+		return msg.Content == expectedMsg
 	})
 }
 
