@@ -107,7 +107,7 @@ func (d *discordTester) FindUserID(t *testing.T, name string) string {
 
 func (d *discordTester) PostInitialMessage(t *testing.T, channelID string) {
 	t.Helper()
-	t.Log("Posting welcome message...")
+	t.Logf("Posting welcome message for channel: %s...", channelID)
 
 	var additionalContextMsg string
 	if d.cfg.AdditionalContextMessage != "" {

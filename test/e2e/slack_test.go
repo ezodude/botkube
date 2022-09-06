@@ -57,7 +57,7 @@ type DiscordConfig struct {
 	BotToken                 string
 	TesterAppToken           string
 	TesterAppBotID           string
-	MessageWaitTimeout       time.Duration `envconfig:"default=30s"`
+	MessageWaitTimeout       time.Duration `envconfig:"default=10s"`
 }
 
 const (
@@ -557,7 +557,7 @@ func TestDiscord(t *testing.T) {
 
 	t.Log("Setting up test Slack setup...")
 	botUserID := discordTester.FindUserIDForBot(t)
-	//testerUserID := discordTester.FindUserIDForTester(t)
+	testerUserID := discordTester.FindUserIDForTester(t)
 	t.Logf("Just loaded botUserID...: %+v", botUserID)
 
 	channel, cleanupChannelFn := discordTester.CreateChannel(t)
@@ -584,7 +584,7 @@ func TestDiscord(t *testing.T) {
 	err = waitForDeploymentReady(deployNsCli, appCfg.Deployment.Name, appCfg.Deployment.WaitTimeout)
 	require.NoError(t, err)
 
-	t.Logf("Waiting for Bot message on channel from user: %+v...\n", botUserID)
+	t.Log("Waiting for Bot message on channel from user")
 	err = discordTester.WaitForMessagePostedRecentlyEqual(botUserID, channel.ID, fmt.Sprintf("...and now my watch begins for cluster '%s'! :crossed_swords:", appCfg.ClusterName))
 	require.NoError(t, err)
 
@@ -610,6 +610,88 @@ func TestDiscord(t *testing.T) {
 		discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
 		err := discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
 		assert.NoError(t, err)
+	})
+
+	t.Run("Commands list", func(t *testing.T) {
+		command := "commands list"
+		expectedMessage := codeBlock(heredoc.Doc(`
+				Enabled executors:
+				  kubectl:
+				    kubectl-allow-all:
+				      namespaces:
+				        include:
+				          - .*
+				      enabled: true
+				      commands:
+				        verbs:
+				          - get
+				        resources:
+				          - deployments
+				    kubectl-read-only:
+				      namespaces:
+				        include:
+				          - botkube
+				          - default
+				      enabled: true
+				      commands:
+				        verbs:
+				          - api-resources
+				          - api-versions
+				          - cluster-info
+				          - describe
+				          - diff
+				          - explain
+				          - get
+				          - logs
+				          - top
+				          - auth
+				        resources:
+				          - deployments
+				          - pods
+				          - namespaces
+				          - daemonsets
+				          - statefulsets
+				          - storageclasses
+				          - nodes
+				          - configmaps
+				      defaultNamespace: default
+				      restrictAccess: false
+				    kubectl-wait-cmd:
+				      namespaces:
+				        include:
+				          - botkube
+				          - default
+				      enabled: true
+				      commands:
+				        verbs:
+				          - wait
+				        resources: []
+				      restrictAccess: false`))
+
+		t.Run("With default cluster", func(t *testing.T) {
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err := discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("With custom cluster name", func(t *testing.T) {
+			command := fmt.Sprintf("commands list --cluster-name %s", appCfg.ClusterName)
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			err = discordTester.WaitForLastMessageEqual(botUserID, channel.ID, expectedMessage)
+			assert.NoError(t, err)
+		})
+
+		t.Run("With unknown cluster name", func(t *testing.T) {
+			command := "commands list --cluster-name non-existing"
+
+			discordTester.PostMessageToBot(t, botUserID, channel.ID, command)
+			t.Log("Ensuring bot didn't write anything new...")
+			time.Sleep(appCfg.Discord.MessageWaitTimeout)
+			// Same expected message as before
+			err = discordTester.WaitForLastMessageContains(testerUserID, channel.ID, command)
+			assert.NoError(t, err)
+		})
 	})
 }
 
