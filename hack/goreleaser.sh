@@ -112,6 +112,19 @@ build_single() {
   rm "$PWD/botkube"
 }
 
+build_single_e2e(){
+  export GORELEASER_CURRENT_TAG=v9.99.9-dev
+  docker run --rm --privileged \
+    -v "$PWD":/go/src/github.com/kubeshop/botkube \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -w /go/src/github.com/kubeshop/botkube \
+    -e GORELEASER_CURRENT_TAG=${GORELEASER_CURRENT_TAG} \
+    -e ANALYTICS_API_KEY="${ANALYTICS_API_KEY}" \
+    goreleaser/goreleaser build --single-target --rm-dist --snapshot --id botkube-test -o "./botkube-e2e.test"
+  docker build -f "$PWD/build/test.Dockerfile" --build-arg=TEST_NAME=botkube-e2e.test --platform "${IMAGE_PLATFORM}" -t "${TEST_IMAGE_REPOSITORY}:${GORELEASER_CURRENT_TAG}" .
+  rm "$PWD/botkube-test"
+}
+
 release() {
   prepare
   if [ -z ${GITHUB_TOKEN} ]
@@ -141,6 +154,9 @@ case "${1}" in
     ;;
   build_single)
     build_single
+    ;;
+  build_single_e2e)
+    build_single_e2e
     ;;
   release)
     release
