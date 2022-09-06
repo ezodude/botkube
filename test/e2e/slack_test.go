@@ -57,9 +57,7 @@ type DiscordConfig struct {
 	TesterName               string `envconfig:"default=tester"`
 	AdditionalContextMessage string `envconfig:"optional"`
 	GuildID                  string
-	BotToken                 string
 	TesterAppToken           string
-	TesterAppBotID           string
 	MessageWaitTimeout       time.Duration `envconfig:"default=10s"`
 }
 
@@ -965,6 +963,46 @@ func TestDiscord(t *testing.T) {
 			)
 		}
 		err = discordTester.WaitForMessagePosted(botUserID, secondChannel.ID, 1, assertionFn)
+		require.NoError(t, err)
+	})
+
+	t.Run("Recommendations", func(t *testing.T) {
+		podCli := k8sCli.CoreV1().Pods(appCfg.Deployment.Namespace)
+
+		t.Log("Creating Pod...")
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      channel.Name,
+				Namespace: appCfg.Deployment.Namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "nginx", Image: "nginx:latest"},
+				},
+			},
+		}
+		require.Len(t, pod.Spec.Containers, 1)
+		pod, err = podCli.Create(context.Background(), pod, metav1.CreateOptions{})
+		require.NoError(t, err)
+
+		t.Cleanup(func() { cleanupCreatedPod(t, podCli, pod.Name) })
+
+		t.Log("Expecting bot message...")
+		assertionFn := func(msg *discordgo.Message) bool {
+			if len(msg.Embeds) != 1 {
+				return false
+			}
+
+			embed := msg.Embeds[0]
+			title := embed.Title
+			fieldMessage := embed.Description
+
+			return title == "v1/pods created" &&
+				strings.Contains(fieldMessage, "Recommendations:") &&
+				strings.Contains(fieldMessage, fmt.Sprintf("- Pod '%s/%s' created without labels. Consider defining them, to be able to use them as a selector e.g. in Service.", pod.Namespace, pod.Name)) &&
+				strings.Contains(fieldMessage, fmt.Sprintf("- The 'latest' tag used in '%s' image of Pod '%s/%s' container '%s' should be avoided.", pod.Spec.Containers[0].Image, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name))
+		}
+		err = discordTester.WaitForMessagePosted(botUserID, channel.ID, 1, assertionFn)
 		require.NoError(t, err)
 	})
 }
