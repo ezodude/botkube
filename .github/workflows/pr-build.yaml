@@ -24,9 +24,10 @@ env:
   HELM_VERSION: v3.9.0
   K3D_VERSION: v5.4.3
   PR_NUMBER: ${{ github.event.pull_request.number }}
-  IMAGE_REGISTRY: "ghcr.io"
+#  IMAGE_REGISTRY: "ghcr.io"
 #  IMAGE_REPOSITORY: "kubeshop/pr/botkube"
 #  TEST_IMAGE_REPOSITORY: "kubeshop/pr/botkube-test"
+  IMAGE_REGISTRY: "docker.io"
   IMAGE_REPOSITORY: "ezokubeshop/pr/botkube"
   TEST_IMAGE_REPOSITORY: "ezokubeshop/pr/botkube-test"
   IMAGE_TAG: ${{ github.event.pull_request.number }}-PR
@@ -44,9 +45,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
+#        with:
+#          ref: ${{ github.event.pull_request.head.sha }}
+#          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@v3
