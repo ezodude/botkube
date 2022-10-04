@@ -27,9 +27,12 @@ env:
 #  IMAGE_REGISTRY: "ghcr.io"
 #  IMAGE_REPOSITORY: "kubeshop/pr/botkube"
 #  TEST_IMAGE_REPOSITORY: "kubeshop/pr/botkube-test"
-  IMAGE_REGISTRY: "docker.io"
-  IMAGE_REPOSITORY: "ezokubeshop/pr/botkube"
-  TEST_IMAGE_REPOSITORY: "ezokubeshop/pr/botkube-test"
+  IMAGE_REGISTRY: "ghcr.io"
+  IMAGE_REPOSITORY: "ezodude/pr/botkube"
+  TEST_IMAGE_REPOSITORY: "ezodude/pr/botkube-test"
+#  IMAGE_REGISTRY: "docker.io"
+#  IMAGE_REPOSITORY: "ezokubeshop/pr/botkube"
+#  TEST_IMAGE_REPOSITORY: "ezokubeshop/pr/botkube-test"
   IMAGE_TAG: ${{ github.event.pull_request.number }}-PR
   IMAGE_SAVE_LOAD_DIR: /tmp/botkube-images
 
@@ -84,8 +87,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          persist-credentials: false
+#        with:
+#          persist-credentials: false
 
       - name: Download artifact
         uses: actions/download-artifact@v2
@@ -96,11 +99,11 @@ jobs:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-#          registry: ghcr.io
-#          username: ${{ github.actor }}
-#          password: ${{ secrets.GITHUB_TOKEN }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+#          username: ${{ secrets.DOCKER_USERNAME }}
+#          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push
         run: make load-and-push-images
