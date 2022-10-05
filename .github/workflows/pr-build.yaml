@@ -116,16 +116,6 @@ jobs:
           cat > $GITHUB_STEP_SUMMARY << ENDOFFILE
 
           ### BotKube image published successfully! :rocket:
-          To test BotKube with PR changes, run:
-
-              gh pr checkout ${PR_NUMBER}
-              helm install botkube -n botkube --create-namespace \\
-              --set image.repository=${IMAGE_REPOSITORY} \\
-              --set image.tag=${IMAGE_TAG} \\
-              --set e2eTest.image.repository=${TEST_IMAGE_REPOSITORY} \\
-              --set e2eTest.image.tag=${IMAGE_TAG} \\
-              ./helm/botkube
-
           ENDOFFILE
 
   integration-tests:
@@ -184,6 +174,7 @@ jobs:
 
       - name: Run ${{ matrix.integration }} tests
         env:
+          KUBECONFIG: "/Users/$USER/.kube/conf"
           SLACK_TESTER_APP_TOKEN: ${{ secrets.SLACK_TESTER_APP_TOKEN }}
           SLACK_ADDITIONAL_CONTEXT_MESSAGE: "Pull request: ${PR_NUMBER} - https://github.com/kubeshop/botkube/pull/${PR_NUMBER}"
           DISCORD_TESTER_APP_TOKEN: ${{ secrets.DISCORD_TESTER_APP_TOKEN }}
