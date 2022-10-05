@@ -30,9 +30,6 @@ env:
   IMAGE_REGISTRY: "ghcr.io"
   IMAGE_REPOSITORY: "ezodude/pr/botkube"
   TEST_IMAGE_REPOSITORY: "ezodude/pr/botkube-test"
-#  IMAGE_REGISTRY: "docker.io"
-#  IMAGE_REPOSITORY: "ezokubeshop/pr/botkube"
-#  TEST_IMAGE_REPOSITORY: "ezokubeshop/pr/botkube-test"
   IMAGE_TAG: ${{ github.event.pull_request.number }}-PR
   IMAGE_SAVE_LOAD_DIR: /tmp/botkube-images
 
@@ -152,6 +149,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: 'go.mod'
+          cache: true
 
       - name: Install Helm
         uses: azure/setup-helm@v1
