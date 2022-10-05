@@ -172,11 +172,6 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_BOT_ID: ${{ secrets.DISCORD_BOT_ID }}
-          SLACK_TESTER_APP_TOKEN: ${{ secrets.SLACK_TESTER_APP_TOKEN }}
-          SLACK_ADDITIONAL_CONTEXT_MESSAGE: "Pull request: ${PR_NUMBER} - https://github.com/kubeshop/botkube/pull/${PR_NUMBER}"
-          DISCORD_TESTER_APP_TOKEN: ${{ secrets.DISCORD_TESTER_APP_TOKEN }}
-          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
-          DISCORD_ADDITIONAL_CONTEXT_MESSAGE: "Pull request: ${PR_NUMBER} - https://github.com/kubeshop/botkube/pull/${PR_NUMBER}"
         run: |
             helm install botkube --namespace botkube ./helm/botkube --wait --create-namespace \
             -f ./helm/botkube/e2e-test-values.yaml \
@@ -188,4 +183,10 @@ jobs:
             --set image.tag="${IMAGE_TAG}" \
 
       - name: Run ${{ matrix.integration }} tests
+        env:
+          SLACK_TESTER_APP_TOKEN: ${{ secrets.SLACK_TESTER_APP_TOKEN }}
+          SLACK_ADDITIONAL_CONTEXT_MESSAGE: "Pull request: ${PR_NUMBER} - https://github.com/kubeshop/botkube/pull/${PR_NUMBER}"
+          DISCORD_TESTER_APP_TOKEN: ${{ secrets.DISCORD_TESTER_APP_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          DISCORD_ADDITIONAL_CONTEXT_MESSAGE: "Pull request: ${PR_NUMBER} - https://github.com/kubeshop/botkube/pull/${PR_NUMBER}"
         run: "make test-integration-${{ matrix.integration }}"
