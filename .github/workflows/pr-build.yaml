@@ -45,9 +45,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-#        with:
-#          ref: ${{ github.event.pull_request.head.sha }}
-#          persist-credentials: false
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -84,8 +84,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-#        with:
-#          persist-credentials: false
+        with:
+          persist-credentials: false
 
       - name: Download artifact
         uses: actions/download-artifact@v2
@@ -99,8 +99,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-#          username: ${{ secrets.DOCKER_USERNAME }}
-#          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push
         run: make load-and-push-images
