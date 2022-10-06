@@ -20,6 +20,7 @@ on:
       - 'README.md'
       - 'global_config.yaml.tpl'
 
+# These are the envs
 env:
   HELM_VERSION: v3.9.0
   K3D_VERSION: v5.4.6
