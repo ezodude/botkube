@@ -17,18 +17,18 @@ func TestTeams_TrimBotMention(t *testing.T) {
 	}{
 		{
 			Name:               "Mention",
-			Input:              "<at>Botkube</at> get pods",
-			ExpectedTrimmedMsg: " get pods",
+			Input:              "<at>Botkube</at> k get pods",
+			ExpectedTrimmedMsg: " k get pods",
 		},
 		{
 			Name:               "Not at the beginning",
-			Input:              "Not at the beginning <at>Botkube</at> get pods",
-			ExpectedTrimmedMsg: "Not at the beginning <at>Botkube</at> get pods",
+			Input:              "Not at the beginning <at>Botkube</at> k get pods",
+			ExpectedTrimmedMsg: "Not at the beginning <at>Botkube</at> k get pods",
 		},
 		{
 			Name:               "Different mention",
-			Input:              "<at>bootkube</at> get pods",
-			ExpectedTrimmedMsg: "<at>bootkube</at> get pods",
+			Input:              "<at>bootkube</at> k get pods",
+			ExpectedTrimmedMsg: "<at>bootkube</at> k get pods",
 		},
 	}
 

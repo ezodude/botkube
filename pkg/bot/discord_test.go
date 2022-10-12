@@ -18,24 +18,24 @@ func TestDiscord_FindAndTrimBotMention(t *testing.T) {
 	}{
 		{
 			Name:               "Mention",
-			Input:              "<@976786722706821120> get pods",
+			Input:              "<@976786722706821120> k get pods",
 			ExpectedFound:      true,
-			ExpectedTrimmedMsg: " get pods",
+			ExpectedTrimmedMsg: " k get pods",
 		},
 		{
 			Name:               "Nickname",
-			Input:              "<@!976786722706821120> get pods",
+			Input:              "<@!976786722706821120> k get pods",
 			ExpectedFound:      true,
-			ExpectedTrimmedMsg: " get pods",
+			ExpectedTrimmedMsg: " k get pods",
 		},
 		{
 			Name:          "Not at the beginning",
-			Input:         "Not at the beginning <@!976786722706821120> get pods",
+			Input:         "Not at the beginning <@!976786722706821120> k get pods",
 			ExpectedFound: false,
 		},
 		{
 			Name:          "Different mention",
-			Input:         "<@97678> get pods",
+			Input:         "<@97678> k get pods",
 			ExpectedFound: false,
 		},
 	}

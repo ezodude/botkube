@@ -18,18 +18,18 @@ func TestSlack_FindAndTrimBotMention(t *testing.T) {
 	}{
 		{
 			Name:               "Mention",
-			Input:              "<@Botkube> get pods",
+			Input:              "<@Botkube> k get pods",
 			ExpectedFound:      true,
-			ExpectedTrimmedMsg: " get pods",
+			ExpectedTrimmedMsg: " k get pods",
 		},
 		{
 			Name:          "Not at the beginning",
-			Input:         "Not at the beginning <@Botkube> get pods",
+			Input:         "Not at the beginning <@Botkube> k get pods",
 			ExpectedFound: false,
 		},
 		{
 			Name:          "Different mention",
-			Input:         "<@bootkube> get pods",
+			Input:         "<@bootkube> k get pods",
 			ExpectedFound: false,
 		},
 	}
