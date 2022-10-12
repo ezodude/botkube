@@ -312,7 +312,7 @@ func runBotTest(t *testing.T,
 
 	t.Run("Executor", func(t *testing.T) {
 		t.Run("Get Deployment", func(t *testing.T) {
-			command := fmt.Sprintf("get deploy -n %s %s", appCfg.Deployment.Namespace, appCfg.Deployment.Name)
+			command := fmt.Sprintf("kubectl get deploy -n %s %s", appCfg.Deployment.Namespace, appCfg.Deployment.Name)
 			assertionFn := func(msg string) bool {
 				return strings.Contains(msg, heredoc.Doc(fmt.Sprintf("`%s` on `%s`", command, appCfg.ClusterName))) &&
 					strings.Contains(msg, "botkube")
@@ -324,7 +324,7 @@ func runBotTest(t *testing.T,
 		})
 
 		t.Run("Get Configmap", func(t *testing.T) {
-			command := fmt.Sprintf("get configmap -n %s", appCfg.Deployment.Namespace)
+			command := fmt.Sprintf("kubectl get configmap -n %s", appCfg.Deployment.Namespace)
 			assertionFn := func(msg string) bool {
 				return strings.Contains(msg, heredoc.Doc(fmt.Sprintf("`%s` on `%s`", command, appCfg.ClusterName))) &&
 					strings.Contains(msg, "kube-root-ca.crt") &&
@@ -337,7 +337,7 @@ func runBotTest(t *testing.T,
 		})
 
 		t.Run("Receive large output as plaintext file with executor command as message", func(t *testing.T) {
-			command := fmt.Sprintf("get configmap %s -o yaml -n %s", globalConfigMapName, appCfg.Deployment.Namespace)
+			command := fmt.Sprintf("kubectl get configmap %s -o yaml -n %s", globalConfigMapName, appCfg.Deployment.Namespace)
 			fileUploadAssertionFn := func(title, mimetype string) bool {
 				return title == "Response.txt" && strings.Contains(mimetype, "text/plain")
 			}
@@ -352,7 +352,7 @@ func runBotTest(t *testing.T,
 		})
 
 		t.Run("Get forbidden resource", func(t *testing.T) {
-			command := "get ingress"
+			command := "kubectl get ingress"
 			expectedBody := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'ingress' resources in the 'default' Namespace on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
 			expectedMessage := fmt.Sprintf("%s\n%s", cmdHeader(command), expectedBody)
 
@@ -382,7 +382,7 @@ func runBotTest(t *testing.T,
 		})
 
 		t.Run("Specify forbidden namespace", func(t *testing.T) {
-			command := "get po --namespace team-b"
+			command := "kubectl get po --namespace team-b"
 			expectedBody := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'po' resources in the 'team-b' Namespace on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
 			expectedMessage := fmt.Sprintf("%s\n%s", cmdHeader(command), expectedBody)
 
@@ -415,7 +415,7 @@ func runBotTest(t *testing.T,
 			})
 
 			t.Run("Get all Pods (the 4th binding)", func(t *testing.T) {
-				command := "get pods -A"
+				command := "kubectl get pods -A"
 				expectedBody := codeBlock(fmt.Sprintf("Sorry, the kubectl command is not authorized to work with 'pods' resources for all Namespaces on cluster '%s'. Use 'commands list' to see allowed commands.", appCfg.ClusterName))
 				expectedMessage := fmt.Sprintf("%s\n%s", cmdHeader(command), expectedBody)
 
@@ -425,7 +425,7 @@ func runBotTest(t *testing.T,
 			})
 
 			t.Run("Get all Deployments (the 4th binding)", func(t *testing.T) {
-				command := "get deploy -A"
+				command := "kubectl get deploy -A"
 				assertionFn := func(msg string) bool {
 					return strings.Contains(msg, heredoc.Doc(fmt.Sprintf("`%s` on `%s`", command, appCfg.ClusterName))) &&
 						strings.Contains(msg, "local-path-provisioner") &&
